@@ -72,9 +72,10 @@ int ParamList::MakeList(char* paramfile)
 	  }
 
 	  loc1 = buffer.find('{', 0);
-	  if(loc1!=std::string::npos)           // get the tag name
+	  if(loc1!=std::string::npos)		// get the tag name
 	  {
-		  prefix = nodeName;
+		  loc2 = buffer.find('=', 0);
+		  prefix = buffer.substr(0, loc2);
 		  buffer = buffer.substr(loc1+1, buffer.length()-loc1-1);
 
 		  if(!nodeName.empty())		// clear the nodeName
@@ -104,15 +105,6 @@ int ParamList::MakeList(char* paramfile)
 			}
 			nodeName += buffer.substr(0, loc1);		// name
 
-			while(true)
-			{
-				loc2 = nodeName.find(" ", 0);	// delete the blank
-				if(loc2!=std::string::npos)
-					nodeName.erase(loc2, 1);
-				else
-					break;
-			}
-
 			// get the value
 			if(bArray)
 			{
@@ -124,11 +116,18 @@ int ParamList::MakeList(char* paramfile)
 				bArray = false;
 			}
 			else
-				nodeValue = buffer.substr(loc1+1, loc2-loc1);
-			// delete select char
-			if(!nodeValue.empty())
 			{
+				nodeValue = buffer.substr(loc1+1, loc2-loc1-1);
+			}
 
+			// delete the blank in the name
+			while(true)
+			{
+				loc1 = nodeName.find(" ", 0);
+				if(loc1!=std::string::npos)
+					nodeName.erase(loc1, 1);
+				else
+					break;
 			}
 
 			// get the comment
@@ -158,7 +157,6 @@ int ParamList::MakeList(char* paramfile)
 
 		  buffer = buffer.substr(0, loc1);
 	  }
-
   }
 
   inFile.close();
@@ -683,7 +681,13 @@ int ParamList::AddValue(char* name, char* sv, char* comment)
  */
 int ParamList::MakeFile(char* paramfile)
 {
+	std::string name, value, comment, prefix;
+	std::string::size_type loc;
 	std::ofstream outFile;
+	bool headBlock, tailBlock, bArray;		// block's head and, flag and array's flag
+	headBlock = tailBlock = bArray = false;
+	int nBlockItem = 0;				// number of block's item
+
 	outFile.open(paramfile);
 	if(!outFile)
 	{
@@ -694,29 +698,95 @@ int ParamList::MakeFile(char* paramfile)
 	p_list* ptrNode = head->next;
 	while(ptrNode!=NULL)
 	{
-		std::string name, value, comment;
 		name = ptrNode->item.name;
 		value = ptrNode->item.value;
 		comment = ptrNode->item.comment;
 
-		outFile << name << '=';
-		if(value.at(0)=='[' && value.at(value.length()-1)==']')
+		// block
+		loc = name.find('.', 0);
+		if(loc!=std::string::npos)
 		{
-			outFile << value << ';' ;
+			std::string temp = name.substr(0, loc);
+			if(temp.compare(prefix)!=0)
+			{
+				headBlock = true;
+				if(!prefix.empty())
+					tailBlock = true;
+
+				nBlockItem = 1;
+			}
+			else
+				nBlockItem++;
+
+			prefix = name.substr(0, loc);
+			name = name.substr(loc+1, name.length()-loc-1);
 		}
-		else
+		else if(!prefix.empty())
 		{
-			outFile << value << ';' ;
+			tailBlock = true;
+			prefix.clear();
+
+			nBlockItem = 0;
 		}
 
+		// output the prefix
+		if(tailBlock)
+		{
+			outFile << '}' << std::endl;
+			tailBlock = false;
+		}
+
+		if(headBlock)
+		{
+			outFile << std::endl;
+			outFile << prefix << '=' << std::endl;
+			outFile << '{' << std::endl;
+
+			headBlock = false;
+		}
+
+		// output the name
+		if(nBlockItem>0)	// aligment in the block
+			outFile << '\t';
+		outFile << name << '=';
+
+		// output the value
+		if(value.at(0)=='[' && value.at(value.length()-1)==']')
+		{
+			bArray = true;
+			outFile << std::endl << '[' << std::endl;
+			value.erase(0, 1);
+			value.erase(value.length()-1, 1);
+		}
+
+		outFile << value ;
+
+		if(bArray)
+		{
+			outFile << std::endl << ']';
+			bArray = false;
+		}
+		outFile << ';';
+
+		// output the comment
 		if(comment.length()>0)
 			outFile << '#' << comment << std::endl;
 		else
 			outFile << std::endl;
 
 		ptrNode = ptrNode->next;
+
+		name.clear();
+		value.clear();
+		comment.clear();
 	}
 
+	// output the last prefix
+	if(nBlockItem>1)
+	{
+		outFile << '}' << std::endl;
+		tailBlock = false;
+	}
 	outFile.close();
 
 	if(ptrNode!=NULL)
