@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <vector>
@@ -17,6 +18,12 @@
 #include "xtiffio.h"
 #include "HdfFile.h"
 #include "HdfData.h"
+
+#define FILE_SIZE_LEN 		16    	// 文件内容的长度
+#define FILE_TIME_LEN 		64    	// 文件最后修改的时间
+#define FILE_NAME_LEN 		256		// 文件名长度
+
+//#define DEBUG
 
 struct ImgInfo
 {
@@ -35,15 +42,19 @@ struct ImgInfo
 	std::string strFilepath;		// 文件路径
 };
 
-int ParseHDF(std::string strFilename, ImgInfo* pImgData);
+int ParseHDF(std::string file_name, ImgInfo* pImgData);
 
 int OutputBand(ImgInfo* pImgData);
 
-int ExtractFiles(std::string strInDirect, std::string strOutDirect);
+int ExtractFiles(std::string indirect, std::string outdirect);
+
+char* DisplayFileAttr(struct stat file_info,std::string file_name);
+
+int IsDir(std::string file_path);
 
 void List(std::string strPath, std::string strSuffix, std::vector<std::string> &files);
 
-void CompletePath(std::string& strFilePath);
+void FillPath(std::string& file_path);
 
 void SetUpTIFFDirectory(TIFF *tif, ImgInfo* pImgData);
 
@@ -51,7 +62,7 @@ void SetUpGeoKeys(GTIF *gtif, ImgInfo* pImgData);
 
 void WriteImage(TIFF *tif, ImgInfo* pImgData, int bandID);
 
-void ClassifyImage(ImgInfo* pImgData);
+void ClassifyImage(ImgInfo* pImgData, std::string out_path);
 
 int main(int argc,char* argv[])
 {
@@ -102,7 +113,7 @@ int main(int argc,char* argv[])
 
 	// 搜索指定路径并将HDF5文件全路径保存
 	filelist.clear();
-	std::string suffix = ".H5";
+	std::string suffix = "H5";
 	List(outPath, suffix, filelist);
 	// 输出搜索到的文件名
 	count = filelist.size();
@@ -138,7 +149,7 @@ int main(int argc,char* argv[])
 
 		// 将影像数据按带号进行分类
 		if(bClassify)
-			ClassifyImage(pImgInfo);
+			ClassifyImage(pImgInfo, outPath);
 
 		if(pImgInfo!=NULL)
 		{
@@ -159,81 +170,86 @@ int main(int argc,char* argv[])
 /*
  * 在指定路径下递归搜索给定后缀的文件，然后将文件路径记录下来
  */
-void List(std::string strPath, std::string strSuffix, std::vector<std::string> &files)
+void List(std::string file_path, std::string suffix, std::vector<std::string> &files)
 {
-	struct dirent* ent = NULL;
-	DIR *pDir;
+	DIR *db;              				// 保存 打开目录类型文件信息的 结构体
+	std::string filename;        		// 文件名
+	struct dirent *dir_info;			// 目录结构体
 
-	if((pDir=opendir((char*)strPath.c_str()))==NULL)
+	if((db=opendir((char*)file_path.c_str()))==NULL)
 	{
-		perror("opendir");
+		perror("opendir error!");
 		return;
 	}
 
-	while (NULL != (ent=readdir(pDir)))
+	while ((dir_info=readdir(db)))
 	{
-		if(strcmp(ent->d_name, ".")==0 ||
-			strcmp(ent->d_name, "..")==0)
+		if(strcmp(dir_info->d_name, ".")==0 ||
+			strcmp(dir_info->d_name, "..")==0)
 			continue;
+		else
+		{
+			filename = file_path;
+			FillPath(filename);
+			filename += dir_info->d_name;
 
-		if (ent->d_type==DT_REG)
-		{
-			std::string suffix = ent->d_name;
-			size_t loc = suffix.find_last_of('.');
-			suffix = suffix.substr(loc, suffix.length()-loc);
-			if(suffix==strSuffix)
+			if(IsDir(filename))		// 判断是否为路径
 			{
-				std::string filename = strPath;
-				CompletePath(filename);
-//				filename += '/';
-				filename += ent->d_name;
-				files.push_back(filename);
+				List(filename, suffix, files);	// 是路径就继续递归查找
 			}
-		}
-		else if(ent->d_type==DT_DIR)
-		{
-			std::string filepath =strPath;
-			CompletePath(filepath);
-//			filepath += '/';
-			filepath += ent->d_name;
-			List(filepath, strSuffix, files);
+			else
+			{
+				std::string file_suffix;
+				file_suffix.clear();
+				if(!suffix.empty())		// 如果没有指定后缀，就将所有搜索到的文件全部放入容器中 [ZuoW,2010/12/27]
+				{
+				   size_t loc = filename.find_last_of('.');
+				   file_suffix = filename.substr(loc+1, filename.length()-loc-1);
+				}
+
+				if(file_suffix==suffix)
+				{
+				   files.push_back(filename);
+				}
+			}
 		}
 	}
 
-	if(closedir(pDir)==-1)
+	if(closedir(db)==-1)
 	{
-        perror("closedir");
+        perror("closedir error!");
 	}
 }
 
+
 /*
  * 简要描述: 从指定路径下将压缩文件解压到目标路径下
- * 输入参数: strInDirect-->输入路径
- *         	strOutDirect-->输出路径
+ * 输入参数: indirect-->输入路径
+ *         	outdirect-->输出路径
  */
-int ExtractFiles(std::string strInDirect, std::string strOutDirect)
+int ExtractFiles(std::string indirect, std::string outdirect)
 {
 	int ret = 0;
 	std::string command;
 	std::vector<std::string> files = std::vector<std::string>();
 
 	files.clear();
-	std::string suffix = ".gz";
+	std::string suffix = "gz";
 
 	// 判断输入/输出路径是否存在
-	if(access(strInDirect.c_str(), R_OK)==-1)
+	if(access(indirect.c_str(), R_OK)==-1)
 		return -1;
-	if(access(strOutDirect.c_str(), R_OK||W_OK)==-1)
+	if(access(outdirect.c_str(), R_OK||W_OK)==-1)
 	{
 		command = "mkdir -p ";
-		command += strOutDirect;
+		command += outdirect;
 		ret = system(command.c_str());
 		if(ret==-1)
 			return -1;
 	}
 
 	// 搜索输入路径下的所有压缩包
-	List(strInDirect, suffix, files);
+	List(indirect, suffix, files);
 
 	// 解压压缩包到指定路径下
 	int count = files.size();
@@ -245,22 +261,23 @@ int ExtractFiles(std::string strInDirect, std::string strOutDirect)
 		command = "tar -zxf ";
 		command += filepath;
 		command += " -C ";
-		command += strOutDirect;
+		command += outdirect;
 		system(command.c_str());
 	}
 
 	return 0;
 }
 
+
 /*
  * 简要描述：解析HDF文件，并将影像属性数据和波段数据读取出来存放在结构体中
- * 输入参数：strFilename-->输入的HDF文件名
+ * 输入参数：file_name-->输入的HDF文件名
  * 输出参数：pImgData-->影像数据结构体
  */
-int ParseHDF(std::string strFilename, ImgInfo* pImgData)
+int ParseHDF(std::string file_name, ImgInfo* pImgData)
 {
 	// HDF解析对象
-	CHdfFile hdf(strFilename.c_str(), true);
+	CHdfFile hdf(file_name.c_str(), true);
 	hid_t rid = hdf.GetRootGroup();
 	H5T_order_t order = H5T_ORDER_LE;
 
@@ -380,9 +397,9 @@ int ParseHDF(std::string strFilename, ImgInfo* pImgData)
 	}
 
 	// 解析输出路径
-	size_t loc = strFilename.find_last_of('/');
-	pImgData->strFilepath = strFilename.substr(0, loc+1);
-	pImgData->strFilename = strFilename.substr(loc+1, strFilename.length()-loc-1);
+	size_t loc = file_name.find_last_of('/');
+	pImgData->strFilepath = file_name.substr(0, loc+1);
+	pImgData->strFilename = file_name.substr(loc+1, file_name.length()-loc-1);
 
 	return 0;
 }
@@ -404,7 +421,7 @@ int OutputBand(ImgInfo* pImgData)
 
 	// 获取输出路径和文件前缀
 	filepath = pImgData->strFilepath;
-	CompletePath(filepath);
+	FillPath(filepath);
 	size_t loc = pImgData->strFilename.find('.');
 	filename = pImgData->strFilename.substr(0, loc);
 
@@ -462,19 +479,62 @@ int OutputBand(ImgInfo* pImgData)
 }
 
 /*
- * 简要描述：判断输入路径后面是否有'/'，如果没有就加上
- * 输入参数：strFilePath-->输入路径
+ * 简要描述：判断是否为一个路径
+ * 输入参数： file_path-->输入路径名
+ * 返回参数：0-->不是路径， 1-->是路径
  */
-void CompletePath(std::string& strFilePath)
+int IsDir(std::string file_path)
 {
-	char szValue[1024];
-	memset(szValue, 0, 1024*sizeof(char));
+	struct stat buf;
+	if(lstat(file_path.c_str(), &buf)<0)
+	{
+	   return 0;
+	}
+	if(S_ISDIR(buf.st_mode))
+	{
+	   return 1; //directory
+	}
 
-	strcpy(szValue, strFilePath.c_str());
-	int nLength = strlen(szValue);
-	if(szValue[nLength-1]!='/')
-		strFilePath += '/';
+	return 0;
 }
+
+
+/*
+ * 简要描述：显示文件属性信息
+ * 输入参数：file_name-->输入文件名
+ * 输出数据：file_info-->文件信息结构体
+ * 返回参数：文件信息字符串
+ */
+char* DisplayFileAttr(struct stat file_info,std::string file_name)
+{
+	char *pFile_mtime_size;        		 		/*函数返回值*/
+	off_t file_size;           					/*文件的大小 （int）*/
+	char size_str[FILE_SIZE_LEN];       		/*文件的大小（字符串）*/
+	char time_str[FILE_TIME_LEN];      		/*文件最后一次修改的时间*/
+	char file_mtime_size[FILE_TIME_LEN]; 	/*文件最后修改时间和大小的字符串*/
+
+	memset( &file_info,0,sizeof(file_info));   	/*将文件信息结构体置 0 */
+	lstat( file_name.c_str(), &file_info );      		/*通过文件路径，把文件信息结构体填满*/
+
+	strftime(time_str, sizeof(time_str), "%Y%m%d%H%M%S",localtime(&file_info.st_mtime)); /*将标准时间格式转成本地时间格式*/
+	file_size=file_info.st_size;
+	sprintf(size_str,"%d",(int)file_size);
+	sprintf(file_mtime_size,"%s*%s",size_str,time_str);
+	pFile_mtime_size=file_mtime_size;
+
+	return pFile_mtime_size;
+}
+
+/*
+ * 简要描述：判断输入路径后面是否有'/'，如果没有就加上
+ * 输入参数：file_path-->输入路径
+ */
+void FillPath(std::string& file_path)
+{
+	if(IsDir(file_path) && file_path.at(file_path.length()-1)!='/')
+		file_path += '/';
+}
+
 
 /*
  * 简要描述：生成TIFF文件的目录
@@ -494,6 +554,7 @@ void SetUpTIFFDirectory(TIFF *tif, ImgInfo* pImgData)
 	TIFFSetField(tif,TIFFTAG_GEOTIEPOINTS, 6,tiepoints);
 	TIFFSetField(tif,TIFFTAG_GEOPIXELSCALE, 3,pixscale);
 }
+
 
 /*
  * 简要描述：生成GeoTIFF文件的标签
@@ -560,11 +621,12 @@ void WriteImage(TIFF *tif, ImgInfo* pImgData, int bandID)
 	}
 }
 
+
 /*
  * 简要描述：对输入影像数据按分带号进行分类
  * 输入参数：
  */
-void ClassifyImage(ImgInfo* pImgData)
+void ClassifyImage(ImgInfo* pImgData, std::string out_path)
 {
 	std::string filepath, zone, command;
 	int ret = 0;
@@ -583,11 +645,12 @@ void ClassifyImage(ImgInfo* pImgData)
 	}
 
 	// 生成输出路径
-	size_t loc = pImgData->strFilepath.find_last_of('/', pImgData->strFilepath.length()-2);
-	filepath = pImgData->strFilepath.substr(0, loc);
-	CompletePath(filepath);
+//	size_t loc = pImgData->strFilepath.find_last_of('/', pImgData->strFilepath.length()-2);
+	filepath = out_path;
+	FillPath(filepath);
 	filepath += zone;
 
+	// 如果分类目录不存在就创建
 	if(access(filepath.c_str(), W_OK)==-1)
 	{
 		command = "mkdir -p ";
@@ -597,10 +660,22 @@ void ClassifyImage(ImgInfo* pImgData)
 			return;
 	}
 
-	// 将文件夹移动到目标路径下
-	command = "mv ";
+	// 如果是已经分类的文件就不进行操作 [ZuoW,2010/12/28]
+	size_t loc = pImgData->strFilepath.find(filepath);
+	if(loc!=std::string::npos)
+		return;
+
+	// 将文件夹复制到目标路径下
+	// (注：改mv为cp，是因为cp可以覆盖合并，如果前后两次对同一文件进行了不同的操作，可将两次操作结果进行合并) [ZuoW,2010/12/28]
+	command = "cp -r ";
 	command += pImgData->strFilepath;
 	command += "  ";
 	command += filepath;
 	system(command.c_str());
+
+	// 删除原文件夹
+	command = "rm -rf ";
+	command += pImgData->strFilepath;
+	system(command.c_str());
 }
+
