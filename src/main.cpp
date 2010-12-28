@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <vector>
 #include <unistd.h>
+#include <getopt.h>
 #include "geotiffio.h"
 #include "xtiffio.h"
 #include "HdfFile.h"
@@ -23,7 +24,20 @@
 #define FILE_TIME_LEN 		64    	// 文件最后修改的时间
 #define FILE_NAME_LEN 		256		// 文件名长度
 
+#define HDFBATCH_VERSION_STRING		"Version 1.5"
+
 //#define DEBUG
+
+// 选项标识 [ZuoW,2010/12/28]
+static struct option hdfbatch_options[] =
+{
+	/* name			has_arg		flag	val */
+	{ "extract",	0,		NULL,	'e' },
+	{ "classify",	0,		NULL,	'c' },
+	{ "help",		0,		NULL,	'h' },
+	{ "version",	0,		NULL,	'v' },
+	{ NULL,			0,		NULL,	0 }
+};
 
 struct ImgInfo
 {
@@ -64,10 +78,18 @@ void WriteImage(TIFF *tif, ImgInfo* pImgData, int bandID);
 
 void ClassifyImage(ImgInfo* pImgData, std::string out_path);
 
+void PrintHelp();
+
+void PrintVersion();
+
 int main(int argc,char* argv[])
 {
 	int ret = 0;
-	bool bClassify = true;		// 是否进行分带保存
+	bool bExtract = false;		// 是否进行解压
+	bool bClassify = false;		// 是否进行分带保存
+	std::string inPath, outPath;
+	int count = 0;
+	std::vector<std::string> filelist = std::vector<std::string>();		// 保存文件路径的容器
 
 	// 测试
 #ifdef TEST
@@ -94,22 +116,65 @@ int main(int argc,char* argv[])
 #endif
 
 	////////////////////////////////////////////////////////////
-	std::string inPath, outPath;
-	int count = 0;
-	std::vector<std::string> filelist = std::vector<std::string>();
-
 #ifdef DEBUG	// debug
 	inPath = "/dps/workdir/HSI/product";
 	outPath = "/dps/workdir/HSI/test";
+	bExtract = bClassify = true;
 #else		// release
-	if(argc<2)
+	int option;
+	do
+	{
+		option = getopt_long(argc, argv, "echv", hdfbatch_options, NULL);
+		if(option==-1)
+			break;
+
+		switch(option)
+		{
+		case 'e':
+			bExtract = true;
+			break;
+		case 'c':
+			bClassify = true;
+			break;
+		case 'h':		// 显示帮组信息
+			PrintHelp();
+			return 0;
+		case 'v':		// 显示版本信息
+			PrintVersion();
+			return 0;
+		default:
+			return 0;
+		}
+	}while(option!=-1);
+	// 读取输入/输出路径
+	if(argc-optind==0)
+	{
+		printf("输入参数错误！\n");
 		return -1;
-	inPath = argv[1];
-	outPath = argv[2];
+	}
+	else
+	{
+		if(bExtract)
+		{
+			inPath = argv[optind];
+			outPath = argv[optind+1];
+		}
+		else
+		{
+			inPath = argv[optind];
+			outPath = inPath;
+		}
+	}
+	if(inPath.empty() || outPath.empty())
+	{
+		printf("输入/输出路径为空!\n");
+		return -1;
+	}
 #endif
 
 	// 解压压缩包
-	ExtractFiles(inPath, outPath);
+	if(bExtract)
+		ExtractFiles(inPath, outPath);
 
 	// 搜索指定路径并将HDF5文件全路径保存
 	filelist.clear();
@@ -679,3 +744,24 @@ void ClassifyImage(ImgInfo* pImgData, std::string out_path)
 	system(command.c_str());
 }
 
+/*
+ * 简要描述：显示帮助信息
+ */
+void PrintHelp ()
+{
+	printf(	"Usage: hdfbatch [options] [inpath] outpath\n"
+		"\n"
+		"--extract\t\t-e\tExtract the compressed files\n"
+		"--classify\t\t-c\tClassify the data files\n"
+		"--help\t\t\t-h\tThis information\n"
+		"--version\t\t-v\tVersion information\n");
+}
+
+/*
+ * 显示版本信息
+ */
+void PrintVersion()
+{
+	printf( "HDFBatch version %s \n", HDFBATCH_VERSION_STRING );
+	printf( "Copyright 2010 MichaelCho.\n" );
+}

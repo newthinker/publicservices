@@ -40,7 +40,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.971820852" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.682651503" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.paths.403195083" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/DPS/lib/MyHDF"/>
+									<listOptionValue builtIn="false" value="/DPS/lib"/>
 									<listOptionValue builtIn="false" value="/usr/local/hdf5_1.6/lib"/>
 									<listOptionValue builtIn="false" value="/usr/local/GeoTIFF/lib"/>
 								</option>

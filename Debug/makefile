@@ -45,7 +45,7 @@ all: HDFBatch
 HDFBatch: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++ -L/DPS/lib/MyHDF -L/usr/local/hdf5_1.6/lib -L/usr/local/GeoTIFF/lib -o"HDFBatch" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -L/DPS/lib -L/usr/local/hdf5_1.6/lib -L/usr/local/GeoTIFF/lib -o"HDFBatch" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
