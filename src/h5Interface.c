@@ -106,7 +106,6 @@ hid_t iH5Open(char* filename, BOOL bOpen)
 	return root_group_id;
 }
 
-
 void iH5Close()
 {
 	if (root_group_id > 0)

@@ -16,53 +16,70 @@
 #include "BaseDefine.h"
 #include "CException.h"
 
-typedef struct ISDSAttr
+// 宏定义：SDS结构体
+struct cHDFSDS
 {
-	int rank;			// 维度
-	int dimension[2];	// 宽，高
-	char units[8];		// 单位
-	int validrange[2];	// 范围
-	int fillvalue;		// 填充值
-	float intercept;	// 步长
-	float slope;		// 斜率
-	char longname[256];	// 长文件名
-}*pISDSAttr;
+	char* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+};
 
-typedef struct LSDSAttr
+struct ucHDFSDS
 {
-	int rank;
-	int dimension[2];
-	char units[8];
-	long validrange[2];
-	long fillvalue;
-	float intercept;
-	float slope;
-	char longname[256];
-}*pLSDSAttr;
+	unsigned char* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+};
 
-typedef struct FSDSAttr
+typedef struct tag_sHDFSDS
 {
-	int rank;
-	int dimension[2];
-	char units[8];
-	float validrange[2];
-	float fillvalue;
-	float intercept;
-	float slope;
-	char longname[256];
-}*pFSDSAttr;
+	short* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+}sHDFSDS;
 
-typedef struct DSDSAttr
+struct usHDFSDS
 {
-	int rank;
-	int dimension[2];
-	char units[8];
-	double validrange[2];
-	double fillvalue;
-	double intercept;
-	double slope;
-	char longname[256];
-}*pDSDSAttr;
+	unsigned short* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+};
+
+struct nHDFSDS
+{
+	int* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+};
+
+struct unHDFSDS
+{
+	unsigned int* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+};
+
+struct fHDFSDS
+{
+	float* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+};
+
+struct dHDFSDS
+{
+	double* pData;
+	int nRank;
+	hsize_t* pDims;
+	int nSize;
+};
 
 /*
  * 定义开辟内存的宏，根据数据类型进行申请内存
