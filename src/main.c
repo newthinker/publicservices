@@ -10,6 +10,8 @@
 
 #include "h5Interface.h"
 
+//#define DEBUG
+
 #ifdef DEBUG
 int main()
 {
@@ -25,10 +27,10 @@ int main()
 		char* cBands;
 		iH5ReadStrAttr(att_id, "Bands", &cBands, TRUE);
 
-		sHDFSDS sHdfSDS;
+		sHDFData sHdfAttr;
 
-		short_ReadNumAttr(att_id, "ProductLines", sHdfSDS.nRank, &sHdfSDS.pDims,
-				H5T_NATIVE_INT, &sHdfSDS.nSize, &sHdfSDS.pData, order, TRUE);
+		short_ReadNumAttr(att_id, "ProductLines", sHdfAttr.nRank, &sHdfAttr.pDims,
+				H5T_NATIVE_INT, &sHdfAttr.nSize, &sHdfAttr.pData, order, TRUE);
 //
 //		hdf.ReadNumAttr(att_id, "ProductSamples", nAttribute.nRank, &nAttribute.pDims,
 //				H5T_NATIVE_INT, &nAttribute.nSize, &nAttribute.pData, order);

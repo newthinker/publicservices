@@ -17,69 +17,69 @@
 #include "CException.h"
 
 // 宏定义：SDS结构体
-struct cHDFSDS
+typedef struct tag_cHDFData
 {
 	char* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-};
+}cHDFData;
 
-struct ucHDFSDS
+typedef struct tag_ucHDFData
 {
 	unsigned char* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-};
+}ucHDFData;
 
-typedef struct tag_sHDFSDS
+typedef struct tag_sHDFData
 {
 	short* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-}sHDFSDS;
+}sHDFData;
 
-struct usHDFSDS
+typedef struct tag_usHDFData
 {
 	unsigned short* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-};
+}usHDFData;
 
-struct nHDFSDS
+typedef struct tag_nHDFData
 {
 	int* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-};
+}nHDFData;
 
-struct unHDFSDS
+typedef struct tag_unHDFData
 {
 	unsigned int* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-};
+}unHDFData;
 
-struct fHDFSDS
+typedef struct tag_fHDFData
 {
 	float* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-};
+}fHDFData;
 
-struct dHDFSDS
+typedef struct tag_dHDFData
 {
 	double* pData;
 	int nRank;
 	hsize_t* pDims;
 	int nSize;
-};
+}dHDFData;
 
 /*
  * 定义开辟内存的宏，根据数据类型进行申请内存
