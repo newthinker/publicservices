@@ -82,7 +82,8 @@ hid_t iH5Open(char* filename, BOOL bOpen)
 	}
 	else
 	{
-		if (access(filename, F_OK) != 0)
+		int ret = access(filename, F_OK);
+		if ( ret!= 0)
 		{
 			if ((file_id = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
 			{

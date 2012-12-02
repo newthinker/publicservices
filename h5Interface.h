@@ -243,7 +243,7 @@ void iH5WriteStrAttr(hid_t loc_id, const char* name, char* value, BOOL bDisp);
 																								\
 		for(i = 0; i < n; i++)																	\
 		{																						\
-			printf(pstrFmt, *(*data+i));														\
+			printf(pstrFmt, (type)(*(*data+i)));														\
 		}																						\
 		printf("\n");																			\
 																								\
